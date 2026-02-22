@@ -1,0 +1,49 @@
+name: Amazon Scraper
+
+on:
+  workflow_dispatch:
+    inputs:
+      asin_list:
+        description: "ASINリスト（カンマ区切り）例: B09DX1R4RQ,B0XXXXXXXX"
+        required: true
+        type: string
+
+jobs:
+  scrape:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      - name: Create Input directory and ASIN list
+        run: |
+          mkdir -p Input Output
+          python -c "
+          from openpyxl import Workbook
+          wb = Workbook()
+          ws = wb.active
+          ws.cell(row=1, column=1, value='ASIN')
+          asins = '${{ github.event.inputs.asin_list }}'.split(',')
+          for i, asin in enumerate(asins, start=2):
+              ws.cell(row=i, column=1, value=asin.strip())
+          wb.save('Input/asin_list.xlsx')
+          print(f'{len(asins)} ASINs written')
+          "
+
+      - name: Run scraper
+        run: python amazon_scraper.py
+
+      - name: Upload results
+        uses: actions/upload-artifact@v4
+        with:
+          name: scrape-results
+          path: Output/asin_results.xlsx
+          retention-days: 30
